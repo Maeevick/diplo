@@ -1,0 +1,12 @@
+[package]
+name = "diplo-game"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+bevy = { version = "0.20.1", default-features = false, features = ["2d"] }
+diplo-core = { path = "../core" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", features = ["Storage", "Window"] }
