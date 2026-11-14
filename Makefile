@@ -2,7 +2,7 @@ SHELL := bash
 .SHELLFLAGS := -euo pipefail -c
 .DEFAULT_GOAL := help
 
-.PHONY: help dev web test check mutants android bump
+.PHONY: help dev web test check mutants android android-push bump
 
 APK := src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
 WIRING := (game|src-tauri)/
@@ -10,7 +10,7 @@ WIRING := (game|src-tauri)/
 VERSIONED := Cargo.toml Cargo.lock src-tauri/tauri.conf.json
 
 help: ## list the targets
-	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-13s %s\n", $$1, $$2}'
 
 dev: ## play on the Mac, in a native window, arrows or clicks
 	cargo run -p diplo-game
@@ -34,6 +34,13 @@ mutants: ## whether the rules' tests bite, at the end of a slice
 android: ## build the APK and install it on the tablet plugged over USB, keeping the leaderboard
 	cargo tauri android build --apk --debug --target aarch64
 	adb install -r $(APK)
+
+android-push: ## build the APK and copy it to the tablet's Downloads, for devices that refuse installs over USB: tap it there
+	cargo tauri android build --apk --debug --target aarch64
+	adb push $(APK) /sdcard/Download/diplo.apk
+	@# A pushed file stays out of the media index the Files app lists, until it is scanned.
+	adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/diplo.apk > /dev/null
+	@echo "on the tablet: Files, Downloads, diplo.apk"
 
 bump: ## every crate and the app at VERSION, committed then tagged vVERSION, never pushed: make bump VERSION=0.2.0
 	@test -n "$(VERSION)" || { echo "which version? make bump VERSION=0.2.0"; exit 2; }
