@@ -16,7 +16,7 @@ T-rexes and giganotosauri. Trees and rocks block everyone, and carnivores turn r
 | Path | What |
 | --- | --- |
 | `core/` | the rules, with no engine: grid, steps, lanes, catches, levels, leaderboard, all tested |
-| `game/` | Bevy 0.20 drawing the core's state, the pixel art and font in `game/src/art.rs` |
+| `game/` | Bevy 0.19.1 drawing the core's state, the pixel art and font in `game/src/art.rs` |
 | `src-tauri/` | the Tauri 2 shell that wraps the wasm build into an Android APK |
 
 ## Play and build
@@ -35,6 +35,8 @@ key, which is enough to install over USB and lets `chrome://inspect` look inside
 
 ## Later
 
+- Back to Bevy 0.20 or later once [bevy#26244](https://github.com/bevyengine/bevy/issues/26244) is fixed: 0.20's sprites
+  render wrong on Android GPUs under WebGL2, and headless Chrome's software renderer does not show it.
 - A second art pass on the spinosaurus, the favourite.
 - Sounds: steps, catches, a level fanfare (started after the first tap, as browsers require).
 - A release APK signed with a personal keystore, and a smaller wasm.

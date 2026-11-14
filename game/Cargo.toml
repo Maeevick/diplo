@@ -5,7 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-bevy = { version = "0.20.1", default-features = false, features = ["2d"] }
+# Held at 0.19.1: 0.20 draws sprites wrong on Android GPUs under WebGL2, https://github.com/bevyengine/bevy/issues/26244
+bevy = { version = "=0.19.1", default-features = false, features = ["2d"] }
 diplo-core = { path = "../core" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
