@@ -4,11 +4,16 @@ use bevy::prelude::*;
 use diplo_core::{Game, Herbivore};
 
 use crate::{
-    Board, FIELD_WIDTH, Run, Screen, pictures::Pictures, spawn_meadow, tap::Tap, text::PixelText,
+    Board, FIELD_WIDTH, MainCamera, Run, Screen, pictures::Pictures, spawn_meadow, tap::Tap,
+    text::PixelText, view_of,
 };
 
 #[derive(Component)]
 struct Choice(Herbivore);
+
+/// The version in the bottom-right corner, to know which build a phone, a tablet or the Mac is running.
+#[derive(Component)]
+struct Version;
 
 const ROWS_Y: [f32; 3] = [55.0, 0.0, -55.0];
 /// How far above or below a dino a tap still picks it: the whole band, for small fingers.
@@ -19,7 +24,10 @@ const CUP_LINE: f32 = -84.0;
 
 pub fn plugin(app: &mut App) {
     app.add_systems(OnEnter(Screen::Choose), (crate::centre_camera, spawn))
-        .add_systems(Update, pick.run_if(in_state(Screen::Choose)));
+        .add_systems(
+            Update,
+            (pick, place_version).run_if(in_state(Screen::Choose)),
+        );
 }
 
 fn spawn(mut commands: Commands, pictures: Res<Pictures>) {
@@ -48,6 +56,25 @@ fn spawn(mut commands: Commands, pictures: Res<Pictures>) {
         Transform::from_xyz(middle, CUP_Y, 5.0).with_scale(Vec3::splat(1.75)),
         DespawnOnExit(Screen::Choose),
     ));
+    commands.spawn((
+        Version,
+        PixelText::new(
+            format!("V{}", env!("CARGO_PKG_VERSION")),
+            Color::srgb(0.76, 0.76, 0.78),
+        ),
+        Transform::from_xyz(0.0, 0.0, 5.0),
+        DespawnOnExit(Screen::Choose),
+    ));
+}
+
+/// Placed every frame: the camera only knows the screen's size once the first frame is drawn.
+fn place_version(
+    projection: Single<&Projection, With<MainCamera>>,
+    version: Single<(&PixelText, &mut Transform), With<Version>>,
+) {
+    let (text, mut transform) = version.into_inner();
+    transform.translation.x = FIELD_WIDTH - text.width() / 2.0 - 3.0;
+    transform.translation.y = view_of(&projection).min.y + 6.0;
 }
 
 fn pick(
