@@ -1,6 +1,7 @@
 //! The game on screen: Bevy draws the core's state and turns taps into steps.
 
 mod art;
+mod away;
 mod board;
 mod choose;
 mod over;
@@ -16,7 +17,7 @@ use diplo_core::{COLUMNS, Cell, Game, Leaderboard};
 /// World units a cell spans: one pixel of the pictures is one unit.
 pub const CELL: f32 = 16.0;
 pub const FIELD_WIDTH: f32 = COLUMNS as f32 * CELL;
-const NIGHT: Color = Color::srgb(
+pub const NIGHT: Color = Color::srgb(
     0x1d as f32 / 255.0,
     0x2b as f32 / 255.0,
     0x53 as f32 / 255.0,
@@ -35,11 +36,12 @@ pub enum Screen {
 #[derive(Resource)]
 pub struct Run(pub Game);
 
-/// The ten best games, and the place of the one just entered.
+/// The ten best games, the place of the one just entered, and whether a game just ended.
 #[derive(Resource)]
 pub struct Board {
     pub leaderboard: Leaderboard,
     pub highlight: Option<usize>,
+    pub after_game: bool,
 }
 
 #[derive(Component)]
@@ -63,10 +65,17 @@ fn main() {
         .insert_resource(Board {
             leaderboard: storage::load(),
             highlight: None,
+            after_game: false,
         })
         .add_plugins((pictures::plugin, camera_plugin, text::plugin, tap::plugin))
         .init_state::<Screen>()
-        .add_plugins((choose::plugin, play::plugin, over::plugin, board::plugin))
+        .add_plugins((
+            choose::plugin,
+            play::plugin,
+            over::plugin,
+            board::plugin,
+            away::plugin,
+        ))
         .run();
 }
 

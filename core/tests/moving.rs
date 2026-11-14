@@ -5,28 +5,25 @@ fn meadow(rows: i32) -> Level {
 }
 
 #[test]
-fn a_tap_above_the_dino_steps_up() {
-    let dino = Cell::new(5, 0);
+fn a_press_above_the_pad_centre_steps_up() {
+    let press = (0.4, 1.2);
 
-    let step = Step::towards(dino, (6.9, 3.2));
+    let step = Step::pointed(press);
 
     assert_eq!(step, Some(Step::Up));
 }
 
 #[test]
-fn a_tap_further_aside_than_above_steps_aside() {
-    let dino = Cell::new(5, 2);
-
-    assert_eq!(Step::towards(dino, (1.0, 3.9)), Some(Step::Left));
-    assert_eq!(Step::towards(dino, (9.0, 1.2)), Some(Step::Right));
-    assert_eq!(Step::towards(dino, (5.4, 0.1)), Some(Step::Down));
+fn a_press_further_aside_than_above_steps_aside() {
+    assert_eq!(Step::pointed((-1.4, 0.9)), Some(Step::Left));
+    assert_eq!(Step::pointed((1.1, -0.8)), Some(Step::Right));
+    assert_eq!(Step::pointed((0.3, -0.7)), Some(Step::Down));
 }
 
 #[test]
-fn a_tap_on_the_dino_itself_asks_for_no_step() {
-    let dino = Cell::new(5, 2);
-
-    assert_eq!(Step::towards(dino, (5.6, 2.3)), None);
+fn a_press_on_the_pad_centre_asks_for_no_step() {
+    assert_eq!(Step::pointed((0.5, -0.5)), None);
+    assert_eq!(Step::pointed((-0.2, 0.4)), None);
 }
 
 #[test]

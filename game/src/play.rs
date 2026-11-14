@@ -1,11 +1,11 @@
-//! The game itself: the level drawn from the core's state, taps turned into steps, and a little drama around catches
-//! and finished levels.
+//! The game itself: the level drawn from the core's state, a pad turning taps into steps, and a little drama around
+//! catches and finished levels.
 
 use bevy::prelude::*;
 use diplo_core::{COLUMNS, Event, Game, Ground, Heading, LANE_LENGTH, LIVES, Step};
 
 use crate::{
-    CELL, FIELD_WIDTH, MainCamera, Run, Screen, centre_of, pictures::Pictures, tap::Tap,
+    CELL, FIELD_WIDTH, MainCamera, NIGHT, Run, Screen, centre_of, pictures::Pictures, tap::Tap,
     text::PixelText, view_of,
 };
 
@@ -16,6 +16,8 @@ const BLINK_SECONDS: f32 = 1.2;
 const LEVEL_PAUSE: f32 = 1.4;
 const GAME_OVER_PAUSE: f32 = 1.6;
 const HUD_HEIGHT: f32 = 16.0;
+/// How long a pressed key of the pad stays pushed in.
+const PRESS_SECONDS: f32 = 0.15;
 /// Grass drawn beyond the level, so the screen never shows the void.
 const MARGIN_ROWS: i32 = 14;
 
@@ -41,6 +43,14 @@ enum Hud {
     Score,
 }
 
+/// The pad along the bottom third of the screen, big enough for a small thumb.
+#[derive(Component, Clone, Copy, PartialEq)]
+enum Pad {
+    Band,
+    Edge,
+    Key(Step),
+}
+
 #[derive(Component)]
 struct Banner(Timer);
 
@@ -55,6 +65,7 @@ struct Show {
     swap_pending: bool,
     ending: Option<Timer>,
     happened: Vec<Event>,
+    pressed: Option<(Step, Timer)>,
 }
 
 pub fn plugin(app: &mut App) {
@@ -62,7 +73,14 @@ pub fn plugin(app: &mut App) {
         Update,
         (
             (run_hunters, walk, react).chain(),
-            (place_hunters, place_dino, follow, place_hud, fade_banners),
+            (
+                place_hunters,
+                place_dino,
+                follow,
+                place_hud,
+                place_pad,
+                fade_banners,
+            ),
         )
             .chain()
             .run_if(in_state(Screen::Play)),
@@ -90,6 +108,7 @@ fn enter(
         swap_pending: false,
         ending: None,
         happened: vec![],
+        pressed: None,
     });
     spawn_level(&mut commands, &pictures, game);
     commands.spawn((
@@ -125,6 +144,37 @@ fn enter(
         ChildOf(camera),
         DespawnOnExit(Screen::Play),
     ));
+    for (pad, sprite) in [
+        (Pad::Band, Sprite::from_color(NIGHT, Vec2::ONE)),
+        (
+            Pad::Edge,
+            Sprite::from_color(Color::srgb(0.37, 0.34, 0.31), Vec2::ONE),
+        ),
+    ] {
+        commands.spawn((
+            pad,
+            sprite,
+            Transform::from_xyz(0.0, 0.0, 55.0),
+            ChildOf(camera),
+            DespawnOnExit(Screen::Play),
+        ));
+    }
+    for step in Step::ALL {
+        commands.spawn((
+            Pad::Key(step),
+            Sprite::from_image(pictures.pad_key.clone()),
+            Transform::from_xyz(0.0, 0.0, 56.0),
+            ChildOf(camera),
+            DespawnOnExit(Screen::Play),
+        ));
+    }
+}
+
+/// The pad's centre around the camera, the width of one of its keys, and the height of its band.
+fn pad_of(view: Rect) -> (Vec2, f32, f32) {
+    let band = view.height() / 3.0;
+    let key = (band / 3.4).min(FIELD_WIDTH / 4.0);
+    (Vec2::new(0.0, view.min.y + band / 2.0), key, band)
 }
 
 fn spawn_level(commands: &mut Commands, pictures: &Pictures, game: &Game) {
@@ -202,16 +252,33 @@ fn run_hunters(
 fn walk(
     tap: Res<Tap>,
     keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    camera: Single<(&Transform, &Projection), With<MainCamera>>,
     mut show: ResMut<Show>,
     mut run: ResMut<Run>,
 ) {
+    let (camera, projection) = *camera;
+    let view = view_of(projection);
+    let (centre, key, band) = pad_of(view);
+    // Only the pad's band counts: a tap on the field could land on a carnivore the player meant to watch.
+    let tapped = tap
+        .0
+        .map(|tap| tap - camera.translation.truncate())
+        .filter(|tap| tap.y < view.min.y + band)
+        .and_then(|tap| {
+            let press = (tap - centre) / key;
+            Step::pointed((press.x, press.y))
+        });
+    if let Some((_, timer)) = show.pressed.as_mut() {
+        timer.tick(time.delta());
+    }
+    if let Some(step) = tapped {
+        show.pressed = Some((step, Timer::from_seconds(PRESS_SECONDS, TimerMode::Once)));
+    }
     if !show.pause.is_finished() || show.swap_pending || show.ending.is_some() {
         return;
     }
     let game = &mut run.0;
-    let tapped = tap
-        .0
-        .and_then(|tap| Step::towards(game.player(), (tap.x / CELL, tap.y / CELL)));
     let pressed = [
         (KeyCode::ArrowUp, Step::Up),
         (KeyCode::ArrowDown, Step::Down),
@@ -239,11 +306,13 @@ fn react(
     run: Res<Run>,
     mut show: ResMut<Show>,
     level_view: Query<Entity, With<InLevel>>,
-    camera: Single<Entity, With<MainCamera>>,
+    camera: Single<(Entity, &Projection), With<MainCamera>>,
     mut dino: Single<&mut Transform, With<DinoView>>,
 ) {
     let game = &run.0;
     let start = centre_of(game.level().start());
+    let (camera, projection) = *camera;
+    let (_, _, band) = pad_of(view_of(projection));
     for event in std::mem::take(&mut show.happened) {
         match event {
             Event::Moved(cell) => show.target = centre_of(cell),
@@ -259,8 +328,10 @@ fn react(
                 commands.spawn((
                     Banner(Timer::from_seconds(LEVEL_PAUSE, TimerMode::Once)),
                     PixelText::new(format!("+{level}"), Color::srgb(1.0, 0.93, 0.15)),
-                    Transform::from_xyz(0.0, 20.0, 45.0).with_scale(Vec3::splat(5.0)),
-                    ChildOf(*camera),
+                    // In the middle of the field, between the strip on top and the pad.
+                    Transform::from_xyz(0.0, (band - HUD_HEIGHT) / 2.0, 45.0)
+                        .with_scale(Vec3::splat(5.0)),
+                    ChildOf(camera),
                     DespawnOnExit(Screen::Play),
                 ));
             }
@@ -341,13 +412,16 @@ fn follow(
     camera: Single<(&mut Transform, &Projection), With<MainCamera>>,
 ) {
     let (mut camera, projection) = camera.into_inner();
-    let half = view_of(projection).height() / 2.0;
-    let lowest = half;
+    let view = view_of(projection);
+    let (_, _, band) = pad_of(view);
+    let half = view.height() / 2.0;
+    // The field shows between the pad and the strip on top: the dino in its middle, the level's edges at its own.
+    let lowest = half - band;
     let highest = run.0.level().rows() as f32 * CELL + HUD_HEIGHT - half;
     let wanted = if highest < lowest {
         (lowest + highest) / 2.0
     } else {
-        dino.translation.y.clamp(lowest, highest)
+        (dino.translation.y - (band - HUD_HEIGHT) / 2.0).clamp(lowest, highest)
     };
     let ease = (8.0 * time.delta_secs()).min(1.0);
     camera.translation.x = FIELD_WIDTH / 2.0;
@@ -386,6 +460,50 @@ fn place_hud(
                     FIELD_WIDTH / 2.0 - 4.0 - text.width() * transform.scale.x / 2.0;
             }
             _ => {}
+        }
+    }
+}
+
+fn place_pad(
+    show: Res<Show>,
+    projection: Single<&Projection, With<MainCamera>>,
+    mut items: Query<(&Pad, &mut Transform, &mut Sprite)>,
+) {
+    let view = view_of(&projection);
+    let (centre, key, band) = pad_of(view);
+    let pushed = show
+        .pressed
+        .as_ref()
+        .filter(|(_, timer)| !timer.is_finished())
+        .map(|(step, _)| *step);
+    for (pad, mut transform, mut sprite) in &mut items {
+        match *pad {
+            // Wide enough to cover the curtains either side on a wide screen.
+            Pad::Band => {
+                sprite.custom_size = Some(Vec2::new(4000.0, band));
+                transform.translation = centre.extend(55.0);
+            }
+            Pad::Edge => {
+                sprite.custom_size = Some(Vec2::new(4000.0, 1.0));
+                transform.translation = Vec3::new(0.0, view.min.y + band, 55.5);
+            }
+            Pad::Key(step) => {
+                let (direction, turn) = match step {
+                    Step::Up => (Vec2::Y, 0.0),
+                    Step::Left => (Vec2::NEG_X, 0.25),
+                    Step::Down => (Vec2::NEG_Y, 0.5),
+                    Step::Right => (Vec2::X, 0.75),
+                };
+                let size = if pushed == Some(step) { 0.85 } else { 1.0 };
+                transform.translation = (centre + direction * key * 1.05).extend(56.0);
+                transform.rotation = Quat::from_rotation_z(turn * std::f32::consts::TAU);
+                transform.scale = Vec3::splat(key / CELL * size);
+                sprite.color = if pushed == Some(step) {
+                    Color::srgb(1.0, 1.0, 0.6)
+                } else {
+                    Color::WHITE
+                };
+            }
         }
     }
 }

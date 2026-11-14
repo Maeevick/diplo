@@ -4,12 +4,14 @@ A Frogger-like for a young player, in 8-bit pixel art: lead a diplodocus, a tric
 bottom of the screen to the flowers at the top, one cell at a time, past velociraptors, atrociraptors, spinosauri,
 T-rexes and giganotosauri. Trees and rocks block everyone, and carnivores turn round when they hit one.
 
-- **Controls:** tap above, below, left or right of the dino; arrows on a keyboard.
+- **Controls:** a four-way pad across the bottom third of the screen; arrows on a keyboard.
 - **Lives:** three drumsticks. A catch costs one and sends the dino back to the start of the level.
 - **Score:** level 1 is worth 1, level 2 is worth 2, and so on.
 - **Difficulty:** each level is taller, faster and more crowded than the last, up to a cap that keeps it playable; every
   level is generated from a seed and checked to be crossable before it is played.
 - **Top 10:** three letters, arcade style, kept on the device. A fresh install starts with ten dinos at 1.
+  The cup under the dinos on the first screen shows it.
+- **Leaving the app** ends the game: coming back, the player starts again from the choice of dino.
 
 ## Layout
 

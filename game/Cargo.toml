@@ -10,4 +10,5 @@ bevy = { version = "=0.19.1", default-features = false, features = ["2d"] }
 diplo-core = { path = "../core" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { version = "0.3", features = ["Storage", "Window"] }
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Document", "Storage", "Window"] }

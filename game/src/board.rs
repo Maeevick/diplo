@@ -6,7 +6,9 @@ use crate::{
     Board, FIELD_WIDTH, Screen, pictures::Pictures, spawn_meadow, tap::Tap, text::PixelText,
 };
 
+/// Taps made in a rush at the end of a game must not skip the board; a visit from the first screen needs no such wait.
 const SETTLE_SECONDS: f32 = 2.5;
+const VISIT_SETTLE_SECONDS: f32 = 0.3;
 
 #[derive(Resource)]
 struct Since(f32);
@@ -42,8 +44,19 @@ fn spawn(mut commands: Commands, pictures: Res<Pictures>, board: Res<Board>, tim
     }
 }
 
-fn again(tap: Res<Tap>, time: Res<Time>, since: Res<Since>, mut next: ResMut<NextState<Screen>>) {
-    if tap.0.is_some() && time.elapsed_secs() - since.0 >= SETTLE_SECONDS {
+fn again(
+    tap: Res<Tap>,
+    time: Res<Time>,
+    since: Res<Since>,
+    board: Res<Board>,
+    mut next: ResMut<NextState<Screen>>,
+) {
+    let settle = if board.after_game {
+        SETTLE_SECONDS
+    } else {
+        VISIT_SETTLE_SECONDS
+    };
+    if tap.0.is_some() && time.elapsed_secs() - since.0 >= settle {
         next.set(Screen::Choose);
     }
 }

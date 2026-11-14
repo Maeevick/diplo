@@ -38,11 +38,10 @@ pub enum Step {
 impl Step {
     pub const ALL: [Step; 4] = [Step::Up, Step::Down, Step::Left, Step::Right];
 
-    /// The step a tap asks for: towards the tap, along the axis it is furthest on, and none on the dino's own cell.
-    /// The tap is in cells, from the bottom-left corner of the level.
-    pub fn towards(dino: Cell, tap: (f32, f32)) -> Option<Step> {
-        let across = tap.0 - (dino.column as f32 + 0.5);
-        let along = tap.1 - (dino.row as f32 + 0.5);
+    /// The step a press on the pad asks for: along the axis the press is furthest from the pad's centre, and none
+    /// on the centre itself. The press is in buttons from the centre, a button being as wide as the centre.
+    pub fn pointed(press: (f32, f32)) -> Option<Step> {
+        let (across, along) = press;
         if across.abs() <= 0.5 && along.abs() <= 0.5 {
             None
         } else if across.abs() > along.abs() {

@@ -123,6 +123,7 @@ fn press(
     }
     if !draft.admitted {
         board.highlight = None;
+        board.after_game = true;
         next.set(Screen::Board);
         return;
     }
@@ -140,6 +141,7 @@ fn press(
             *board = Board {
                 leaderboard,
                 highlight: place,
+                after_game: true,
             };
             next.set(Screen::Board);
         }
