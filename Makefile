@@ -2,10 +2,12 @@ SHELL := bash
 .SHELLFLAGS := -euo pipefail -c
 .DEFAULT_GOAL := help
 
-.PHONY: help dev web test check mutants android
+.PHONY: help dev web test check mutants android bump
 
 APK := src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
 WIRING := (game|src-tauri)/
+# Where the version lives: the crates', and the app's, which names the APK's version.
+VERSIONED := Cargo.toml Cargo.lock src-tauri/tauri.conf.json
 
 help: ## list the targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -32,3 +34,14 @@ mutants: ## whether the rules' tests bite, at the end of a slice
 android: ## build the APK and install it on the tablet plugged over USB, keeping the leaderboard
 	cargo tauri android build --apk --debug --target aarch64
 	adb install -r $(APK)
+
+bump: ## every crate and the app at VERSION, committed then tagged vVERSION, never pushed: make bump VERSION=0.2.0
+	@test -n "$(VERSION)" || { echo "which version? make bump VERSION=0.2.0"; exit 2; }
+	@! git rev-parse --quiet --verify "refs/tags/v$(VERSION)" > /dev/null || { echo "v$(VERSION) is already tagged"; exit 2; }
+	@git diff --quiet HEAD -- $(VERSIONED) || { echo "$(VERSIONED) carry changes of their own: commit or stash them first"; exit 2; }
+	@VERSION="$(VERSION)" perl -0pi -e 's/(\[workspace\.package\]\nversion = )"[^"]*"/$$1"$$ENV{VERSION}"/' Cargo.toml
+	@VERSION="$(VERSION)" perl -pi -e 's/^(\s*"version": )"[^"]*"/$$1"$$ENV{VERSION}"/' src-tauri/tauri.conf.json
+	@cargo update --workspace --offline --quiet
+	@git commit --quiet -m "chore: every crate and the app at $(VERSION)" -- $(VERSIONED)
+	@git tag -a "v$(VERSION)" -m "diplo $(VERSION)"
+	@echo "every crate and the app at $(VERSION), tagged v$(VERSION); push both with: git push --follow-tags"
